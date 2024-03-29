@@ -32,57 +32,58 @@ app.get("/register", (req, res) => {
 });
 
 app.post("/register", async (req, res) => {
-
-
-  try{
-
+  try {
     const username = req.body.username;
     const password = req.body.password;
-    console.log(username, password);
-
-    const insertdata = db.query("INSERT INTO users (username, password) VALUES ($1, $2);", [username, password]);
-
-    res.render("home.ejs", {msg: "login with id and password to see the secrets"});
     
-  }
-
-  catch (err)
-  {
+    // Check if the username already exists in the database
+    const userExists = await db.query("SELECT * FROM users WHERE username = $1", [username]);
+    
+    if (userExists.rows.length > 0) {
+      // Username already exists, send an error response
+      res.render("register.ejs", { msg : "Username already exists. Please choose a different username"});
+    } else {
+      // Username doesn't exist, proceed with registration
+      const insertdata = await db.query("INSERT INTO users (username, password) VALUES ($1, $2);", [username, password]);
+      res.render("home.ejs", { msg: "Login with id and password to see the secrets" });
+    }
+  } catch (err) {
+    // Handle any errors
     console.log(err);
+    res.status(500).send("Internal Server Error");
   }
 });
 
 app.post("/login", async (req, res) => {
-
   const username = req.body.username;
   const password = req.body.password;
 
-
-  try{
-
+  try {
     const result = await db.query("SELECT password FROM users WHERE username = $1;", [username]);
-    console.log(result.rows[0].password);
 
+    // Check if any rows were returned by the query
+    if (result.rows.length > 0) {
+      const storedPassword = result.rows[0].password;
 
-    if (password == result.rows[0].password)
-    {
-      res.render("secrets.ejs");
+      // Compare the stored password with the provided password
+      if (password === storedPassword) {
+        // Passwords match, render secrets page
+        res.render("secrets.ejs");
+      } else {
+        // Passwords do not match, render login page with error message
+        res.render("login.ejs", { msg: "Wrong username or password" });
+      }
+    } else {
+      // Username not found in the database, render login page with error message
+      res.render("login.ejs", { msg: "Wrong username or password" });
     }
-    else
-    {
-      res.render("login.ejs", {msg: "Wrong username or password"});
-
-    }
-
-
-
-  }
-  catch (err){
+  } catch (err) {
+    // Handle any errors
     console.log(err);
+    res.status(500).send("Internal Server Error");
   }
-
-  
 });
+
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
